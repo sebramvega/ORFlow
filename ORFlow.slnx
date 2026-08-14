@@ -5,4 +5,7 @@
     <Project Path="src/ORFlow.Domain/ORFlow.Domain.csproj" />
     <Project Path="src/ORFlow.Infrastructure/ORFlow.Infrastructure.csproj" />
   </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/ORFlow.Domain.Tests/ORFlow.Domain.Tests.csproj" />
+  </Folder>
 </Solution>
