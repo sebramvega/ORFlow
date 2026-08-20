@@ -3,6 +3,10 @@ namespace ORFlow.Domain.SurgeryRequests;
 
 public class SurgeryRequest
 {
+
+    private SurgeryRequest()
+    {
+    }
     public SurgeryRequest(
         Guid patientId,
         Guid surgeonId,
@@ -48,8 +52,8 @@ public class SurgeryRequest
     public Guid PatientId { get; private set; }
     public Guid SurgeonId { get; private set; }
     public Guid OperatingRoomId { get; private set; }
-    public string ProcedureName { get; private set; }
-    public TimeRange RequestedTime { get; private set; }
+    public string ProcedureName { get; private set; } = null!;
+    public TimeRange RequestedTime { get; private set; } = null!;
     public RequestStatus RequestStatus { get; private set; }
 
     public void Approve()
