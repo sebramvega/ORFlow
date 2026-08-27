@@ -22,4 +22,9 @@ public sealed class SurgeryRequestRepository : ISurgeryRequestRepository
         return await _dbContext.SurgeryRequests.FindAsync(surgeryRequestId);
     }
 
+    public async Task SaveChangesAsync()
+    {
+        await _dbContext.SaveChangesAsync();
+    }
+
 }

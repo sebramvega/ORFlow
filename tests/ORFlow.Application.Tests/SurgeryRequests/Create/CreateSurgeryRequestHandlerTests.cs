@@ -58,5 +58,9 @@ public class CreateSurgeryRequestHandlerTests
         {
             return Task.FromResult<SurgeryRequest?>(null);
         }
+        public Task SaveChangesAsync()
+        {
+            return Task.CompletedTask;
+        }
     }
 }

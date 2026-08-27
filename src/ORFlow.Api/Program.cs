@@ -4,6 +4,8 @@ using ORFlow.Infrastructure.Persistence;
 using ORFlow.Application.SurgeryRequests.Common;
 using ORFlow.Infrastructure.Persistence.Repositories;
 using ORFlow.Application.SurgeryRequests.GetById;
+using ORFlow.Application.SurgeryRequests.Approve;
+using ORFlow.Domain.SurgeryRequests;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -16,6 +18,7 @@ builder.Services.AddDbContext<ORFlowDbContext>(options =>
 builder.Services.AddScoped<ISurgeryRequestRepository, SurgeryRequestRepository>();
 builder.Services.AddScoped<CreateSurgeryRequestHandler>();
 builder.Services.AddScoped<GetSurgeryRequestByIdHandler>();
+builder.Services.AddScoped<ApproveSurgeryRequestHandler>();
 
 var app = builder.Build();
 
@@ -47,6 +50,21 @@ app.MapGet("/surgery-requests/{id:guid}", async (
 ) =>
 {
     var surgeryRequest = await handler.HandleAsync(id);
+
+    if (surgeryRequest is null)
+    {
+        return Results.NotFound();
+    }
+
+    return Results.Ok(surgeryRequest);
+});
+
+app.MapPost("/surgery-requests/{id:guid}/approve", async (
+    Guid id,
+    ApproveSurgeryRequestHandler handler
+) =>
+{
+    SurgeryRequest? surgeryRequest = await handler.HandleAsync(id);
 
     if (surgeryRequest is null)
     {
