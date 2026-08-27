@@ -1,11 +1,11 @@
 using Microsoft.EntityFrameworkCore;
-using ORFlow.Application.SurgeryRequests.Create;
-using ORFlow.Infrastructure.Persistence;
-using ORFlow.Application.SurgeryRequests.Common;
-using ORFlow.Infrastructure.Persistence.Repositories;
-using ORFlow.Application.SurgeryRequests.GetById;
 using ORFlow.Application.SurgeryRequests.Approve;
+using ORFlow.Application.SurgeryRequests.Common;
+using ORFlow.Application.SurgeryRequests.Create;
+using ORFlow.Application.SurgeryRequests.GetById;
 using ORFlow.Domain.SurgeryRequests;
+using ORFlow.Infrastructure.Persistence;
+using ORFlow.Infrastructure.Persistence.Repositories;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -40,8 +40,8 @@ app.MapPost("/surgery-requests", async (
     var surgeryRequest = await handler.HandleAsync(command);
 
     return Results.Created(
-    $"/surgery-requests/{surgeryRequest.SurgeryRequestId}",
-    surgeryRequest);
+        $"/surgery-requests/{surgeryRequest.SurgeryRequestId}",
+        surgeryRequest);
 });
 
 app.MapGet("/surgery-requests/{id:guid}", async (
