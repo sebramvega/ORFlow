@@ -53,5 +53,10 @@ public class CreateSurgeryRequestHandlerTests
 
             return Task.CompletedTask;
         }
+        public Task<SurgeryRequest?> GetSurgeryRequestByIdAsync(
+            Guid surgeryRequestId)
+        {
+            return Task.FromResult<SurgeryRequest?>(null);
+        }
     }
 }
