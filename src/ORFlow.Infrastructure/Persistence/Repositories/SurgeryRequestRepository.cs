@@ -31,6 +31,7 @@ public sealed class SurgeryRequestRepository : ISurgeryRequestRepository
     {
         return await _dbContext.SurgeryRequests
             .Where(surgeryRequest =>
+                surgeryRequest.RequestStatus == RequestStatus.Scheduled &&
                 surgeryRequest.RequestedTime.Start < requestedTime.End &&
                 requestedTime.Start < surgeryRequest.RequestedTime.End)
             .ToListAsync();

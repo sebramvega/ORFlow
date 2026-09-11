@@ -3,6 +3,7 @@ using ORFlow.Application.SurgeryRequests.Approve;
 using ORFlow.Application.SurgeryRequests.Common;
 using ORFlow.Application.SurgeryRequests.Create;
 using ORFlow.Application.SurgeryRequests.GetById;
+using ORFlow.Application.SurgeryRequests.Schedule;
 using ORFlow.Domain.SurgeryRequests;
 using ORFlow.Infrastructure.Persistence;
 using ORFlow.Infrastructure.Persistence.Repositories;
@@ -19,6 +20,7 @@ builder.Services.AddScoped<ISurgeryRequestRepository, SurgeryRequestRepository>(
 builder.Services.AddScoped<CreateSurgeryRequestHandler>();
 builder.Services.AddScoped<GetSurgeryRequestByIdHandler>();
 builder.Services.AddScoped<ApproveSurgeryRequestHandler>();
+builder.Services.AddScoped<ScheduleSurgeryRequestHandler>();
 
 var app = builder.Build();
 
@@ -72,6 +74,30 @@ app.MapPost("/surgery-requests/{id:guid}/approve", async (
     }
 
     return Results.Ok(surgeryRequest);
+});
+
+app.MapPost("/surgery-requests/{id:guid}/schedule", async (
+    Guid id,
+    ScheduleSurgeryRequestHandler handler
+) =>
+{
+    ScheduleSurgeryRequestResult result = await handler.HandleAsync(id);
+
+    if (result.SurgeryRequest is null)
+    {
+        return Results.NotFound();
+    }
+
+    if (result.HasConflict)
+    {
+        return Results.Conflict(new
+        {
+            message = "Scheduling conflict detected.",
+            surgeryRequest = result.SurgeryRequest
+        });
+    }
+
+    return Results.Ok(result.SurgeryRequest);
 });
 
 app.Run();
