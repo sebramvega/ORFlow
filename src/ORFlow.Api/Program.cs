@@ -1,5 +1,4 @@
 using Microsoft.AspNetCore.Identity;
-using ORFlow.Infrastructure.Identity;
 using Microsoft.EntityFrameworkCore;
 using ORFlow.Application.SurgeryRequests.Approve;
 using ORFlow.Application.SurgeryRequests.Archive;
@@ -9,22 +8,37 @@ using ORFlow.Application.SurgeryRequests.Create;
 using ORFlow.Application.SurgeryRequests.GetById;
 using ORFlow.Application.SurgeryRequests.Schedule;
 using ORFlow.Domain.SurgeryRequests;
+using ORFlow.Infrastructure.Identity;
 using ORFlow.Infrastructure.Persistence;
 using ORFlow.Infrastructure.Persistence.Repositories;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
-// Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
+
 builder.Services.AddDbContext<ORFlowDbContext>(options =>
     options.UseSqlServer(
         builder.Configuration.GetConnectionString("ORFlowDatabase")));
+
 builder.Services
     .AddIdentityApiEndpoints<ApplicationUser>()
     .AddRoles<IdentityRole<Guid>>()
     .AddEntityFrameworkStores<ORFlowDbContext>();
-builder.Services.AddAuthorization();
+
+builder.Services.AddAuthorization(options =>
+{
+    options.AddPolicy("CanCreateSurgeryRequest", policy =>
+        policy.RequireRole(
+            ApplicationRoles.Surgeon,
+            ApplicationRoles.Administrator));
+
+    options.AddPolicy("CanManageSurgeryRequest", policy =>
+        policy.RequireRole(
+            ApplicationRoles.Scheduler,
+            ApplicationRoles.Administrator));
+});
+
 builder.Services.AddScoped<ISurgeryRequestRepository, SurgeryRequestRepository>();
 builder.Services.AddScoped<CreateSurgeryRequestHandler>();
 builder.Services.AddScoped<GetSurgeryRequestByIdHandler>();
@@ -35,6 +49,7 @@ builder.Services.AddScoped<ArchiveSurgeryRequestHandler>();
 
 var app = builder.Build();
 
+// Initialize the database and Identity roles.
 using (IServiceScope scope = app.Services.CreateScope())
 {
     ORFlowDbContext dbContext =
@@ -58,11 +73,14 @@ app.UseHttpsRedirection();
 app.UseAuthentication();
 app.UseAuthorization();
 
+// Authentication endpoints.
 app.MapGroup("/auth")
     .MapIdentityApi<ApplicationUser>();
-    
+
+// Public health endpoint.
 app.MapGet("/health", () => "ORFlow API is running.");
 
+// Surgery request endpoints.
 app.MapPost("/surgery-requests", async (
     CreateSurgeryRequestCommand command,
     CreateSurgeryRequestHandler handler
@@ -73,7 +91,8 @@ app.MapPost("/surgery-requests", async (
     return Results.Created(
         $"/surgery-requests/{surgeryRequest.SurgeryRequestId}",
         surgeryRequest);
-});
+})
+.RequireAuthorization("CanCreateSurgeryRequest");
 
 app.MapGet("/surgery-requests/{id:guid}", async (
     Guid id,
@@ -88,7 +107,8 @@ app.MapGet("/surgery-requests/{id:guid}", async (
     }
 
     return Results.Ok(surgeryRequest);
-});
+})
+.RequireAuthorization();
 
 app.MapPost("/surgery-requests/{id:guid}/approve", async (
     Guid id,
@@ -103,7 +123,8 @@ app.MapPost("/surgery-requests/{id:guid}/approve", async (
     }
 
     return Results.Ok(surgeryRequest);
-});
+})
+.RequireAuthorization("CanManageSurgeryRequest");
 
 app.MapPost("/surgery-requests/{id:guid}/schedule", async (
     Guid id,
@@ -127,7 +148,8 @@ app.MapPost("/surgery-requests/{id:guid}/schedule", async (
     }
 
     return Results.Ok(result.SurgeryRequest);
-});
+})
+.RequireAuthorization("CanManageSurgeryRequest");
 
 app.MapPost("/surgery-requests/{id:guid}/complete", async (
     Guid id,
@@ -142,7 +164,8 @@ app.MapPost("/surgery-requests/{id:guid}/complete", async (
     }
 
     return Results.Ok(surgeryRequest);
-});
+})
+.RequireAuthorization("CanManageSurgeryRequest");
 
 app.MapPost("/surgery-requests/{id:guid}/archive", async (
     Guid id,
@@ -157,7 +180,8 @@ app.MapPost("/surgery-requests/{id:guid}/archive", async (
     }
 
     return Results.Ok(surgeryRequest);
-});
+})
+.RequireAuthorization("CanManageSurgeryRequest");
 
 app.Run();
 

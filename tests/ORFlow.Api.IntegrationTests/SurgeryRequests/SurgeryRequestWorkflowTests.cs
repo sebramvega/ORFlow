@@ -1,23 +1,37 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using ORFlow.Api.IntegrationTests.Authentication;
+using ORFlow.Infrastructure.Identity;
 
 namespace ORFlow.Api.IntegrationTests.SurgeryRequests;
 
 public class SurgeryRequestWorkflowTests
     : IClassFixture<CustomWebApplicationFactory>
 {
-    private readonly HttpClient _client;
+    private readonly CustomWebApplicationFactory _factory;
 
     public SurgeryRequestWorkflowTests(
         CustomWebApplicationFactory factory)
     {
-        _client = factory.CreateClient();
+        _factory = factory;
     }
 
     [Fact]
     public async Task SurgeryRequest_CanMoveThroughCompleteWorkflow()
     {
+        HttpClient surgeonClient =
+            await AuthenticationHelper.CreateAuthenticatedClientAsync(
+                _factory,
+                $"surgeon-{Guid.NewGuid()}@orflow.test",
+                ApplicationRoles.Surgeon);
+
+        HttpClient schedulerClient =
+            await AuthenticationHelper.CreateAuthenticatedClientAsync(
+                _factory,
+                $"scheduler-{Guid.NewGuid()}@orflow.test",
+                ApplicationRoles.Scheduler);
+
         var command = new
         {
             PatientId = Guid.NewGuid(),
@@ -31,7 +45,7 @@ public class SurgeryRequestWorkflowTests
         };
 
         HttpResponseMessage createResponse =
-            await _client.PostAsJsonAsync(
+            await surgeonClient.PostAsJsonAsync(
                 "/surgery-requests",
                 command);
 
@@ -50,7 +64,7 @@ public class SurgeryRequestWorkflowTests
             created.GetProperty("requestStatus").GetInt32());
 
         HttpResponseMessage approveResponse =
-            await _client.PostAsync(
+            await schedulerClient.PostAsync(
                 $"/surgery-requests/{surgeryRequestId}/approve",
                 null);
 
@@ -66,7 +80,7 @@ public class SurgeryRequestWorkflowTests
             approved.GetProperty("requestStatus").GetInt32());
 
         HttpResponseMessage scheduleResponse =
-            await _client.PostAsync(
+            await schedulerClient.PostAsync(
                 $"/surgery-requests/{surgeryRequestId}/schedule",
                 null);
 
@@ -82,7 +96,7 @@ public class SurgeryRequestWorkflowTests
             scheduled.GetProperty("requestStatus").GetInt32());
 
         HttpResponseMessage completeResponse =
-            await _client.PostAsync(
+            await schedulerClient.PostAsync(
                 $"/surgery-requests/{surgeryRequestId}/complete",
                 null);
 
@@ -98,7 +112,7 @@ public class SurgeryRequestWorkflowTests
             completed.GetProperty("requestStatus").GetInt32());
 
         HttpResponseMessage archiveResponse =
-            await _client.PostAsync(
+            await schedulerClient.PostAsync(
                 $"/surgery-requests/{surgeryRequestId}/archive",
                 null);
 
@@ -114,7 +128,7 @@ public class SurgeryRequestWorkflowTests
             archived.GetProperty("requestStatus").GetInt32());
 
         HttpResponseMessage getResponse =
-            await _client.GetAsync(
+            await schedulerClient.GetAsync(
                 $"/surgery-requests/{surgeryRequestId}");
 
         Assert.Equal(
@@ -132,6 +146,18 @@ public class SurgeryRequestWorkflowTests
     [Fact]
     public async Task Schedule_WhenOverlappingRequestUsesSameSurgeon_ReturnsConflict()
     {
+        HttpClient surgeonClient =
+            await AuthenticationHelper.CreateAuthenticatedClientAsync(
+                _factory,
+                $"surgeon-{Guid.NewGuid()}@orflow.test",
+                ApplicationRoles.Surgeon);
+
+        HttpClient schedulerClient =
+            await AuthenticationHelper.CreateAuthenticatedClientAsync(
+                _factory,
+                $"scheduler-{Guid.NewGuid()}@orflow.test",
+                ApplicationRoles.Scheduler);
+
         Guid surgeonId = Guid.NewGuid();
 
         DateTimeOffset startTime =
@@ -149,7 +175,7 @@ public class SurgeryRequestWorkflowTests
         };
 
         HttpResponseMessage firstCreateResponse =
-            await _client.PostAsJsonAsync(
+            await surgeonClient.PostAsJsonAsync(
                 "/surgery-requests",
                 firstCommand);
 
@@ -165,7 +191,7 @@ public class SurgeryRequestWorkflowTests
             firstCreated.GetProperty("surgeryRequestId").GetGuid();
 
         HttpResponseMessage firstApproveResponse =
-            await _client.PostAsync(
+            await schedulerClient.PostAsync(
                 $"/surgery-requests/{firstRequestId}/approve",
                 null);
 
@@ -174,7 +200,7 @@ public class SurgeryRequestWorkflowTests
             firstApproveResponse.StatusCode);
 
         HttpResponseMessage firstScheduleResponse =
-            await _client.PostAsync(
+            await schedulerClient.PostAsync(
                 $"/surgery-requests/{firstRequestId}/schedule",
                 null);
 
@@ -193,7 +219,7 @@ public class SurgeryRequestWorkflowTests
         };
 
         HttpResponseMessage secondCreateResponse =
-            await _client.PostAsJsonAsync(
+            await surgeonClient.PostAsJsonAsync(
                 "/surgery-requests",
                 secondCommand);
 
@@ -209,7 +235,7 @@ public class SurgeryRequestWorkflowTests
             secondCreated.GetProperty("surgeryRequestId").GetGuid();
 
         HttpResponseMessage secondApproveResponse =
-            await _client.PostAsync(
+            await schedulerClient.PostAsync(
                 $"/surgery-requests/{secondRequestId}/approve",
                 null);
 
@@ -218,7 +244,7 @@ public class SurgeryRequestWorkflowTests
             secondApproveResponse.StatusCode);
 
         HttpResponseMessage secondScheduleResponse =
-            await _client.PostAsync(
+            await schedulerClient.PostAsync(
                 $"/surgery-requests/{secondRequestId}/schedule",
                 null);
 
@@ -242,7 +268,7 @@ public class SurgeryRequestWorkflowTests
                 .GetInt32());
 
         HttpResponseMessage getResponse =
-            await _client.GetAsync(
+            await schedulerClient.GetAsync(
                 $"/surgery-requests/{secondRequestId}");
 
         Assert.Equal(
@@ -257,5 +283,4 @@ public class SurgeryRequestWorkflowTests
             1,
             retrieved.GetProperty("requestStatus").GetInt32());
     }
-
 }
