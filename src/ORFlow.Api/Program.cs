@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using ORFlow.Application.SurgeryRequests.Approve;
+using ORFlow.Application.SurgeryRequests.Archive;
 using ORFlow.Application.SurgeryRequests.Common;
 using ORFlow.Application.SurgeryRequests.Complete;
 using ORFlow.Application.SurgeryRequests.Create;
@@ -23,6 +24,7 @@ builder.Services.AddScoped<GetSurgeryRequestByIdHandler>();
 builder.Services.AddScoped<ApproveSurgeryRequestHandler>();
 builder.Services.AddScoped<ScheduleSurgeryRequestHandler>();
 builder.Services.AddScoped<CompleteSurgeryRequestHandler>();
+builder.Services.AddScoped<ArchiveSurgeryRequestHandler>();
 
 var app = builder.Build();
 
@@ -105,6 +107,21 @@ app.MapPost("/surgery-requests/{id:guid}/schedule", async (
 app.MapPost("/surgery-requests/{id:guid}/complete", async (
     Guid id,
     CompleteSurgeryRequestHandler handler
+) =>
+{
+    SurgeryRequest? surgeryRequest = await handler.HandleAsync(id);
+
+    if (surgeryRequest is null)
+    {
+        return Results.NotFound();
+    }
+
+    return Results.Ok(surgeryRequest);
+});
+
+app.MapPost("/surgery-requests/{id:guid}/archive", async (
+    Guid id,
+    ArchiveSurgeryRequestHandler handler
 ) =>
 {
     SurgeryRequest? surgeryRequest = await handler.HandleAsync(id);
