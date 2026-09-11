@@ -1,6 +1,7 @@
 using ORFlow.Application.SurgeryRequests.Common;
 using ORFlow.Application.SurgeryRequests.GetById;
 using ORFlow.Domain.SurgeryRequests;
+using ORFlow.Domain.Scheduling;
 
 namespace ORFlow.Application.Tests.SurgeryRequests.GetById;
 
@@ -75,6 +76,14 @@ public class GetSurgeryRequestByIdHandlerTests
 
             return Task.FromResult<SurgeryRequest?>(null);
         }
+
+        public Task<IReadOnlyList<SurgeryRequest>> GetOverlappingRequestsAsync(
+    TimeRange requestedTime)
+        {
+            return Task.FromResult<IReadOnlyList<SurgeryRequest>>(
+                Array.Empty<SurgeryRequest>());
+        }
+        
         public Task SaveChangesAsync()
         {
             return Task.CompletedTask;

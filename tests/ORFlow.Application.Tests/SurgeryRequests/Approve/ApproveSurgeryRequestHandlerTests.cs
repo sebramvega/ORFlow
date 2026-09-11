@@ -1,6 +1,7 @@
 using ORFlow.Application.SurgeryRequests.Approve;
 using ORFlow.Application.SurgeryRequests.Common;
 using ORFlow.Domain.SurgeryRequests;
+using ORFlow.Domain.Scheduling;
 
 namespace ORFlow.Application.Tests.SurgeryRequests.Approve;
 
@@ -80,6 +81,13 @@ public class ApproveSurgeryRequestHandlerTests
             }
 
             return Task.FromResult<SurgeryRequest?>(null);
+        }
+        
+        public Task<IReadOnlyList<SurgeryRequest>> GetOverlappingRequestsAsync(
+    TimeRange requestedTime)
+        {
+            return Task.FromResult<IReadOnlyList<SurgeryRequest>>(
+                Array.Empty<SurgeryRequest>());
         }
 
         public Task SaveChangesAsync()
