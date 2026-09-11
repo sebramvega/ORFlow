@@ -135,3 +135,5 @@ app.MapPost("/surgery-requests/{id:guid}/archive", async (
 });
 
 app.Run();
+
+public partial class Program { }
