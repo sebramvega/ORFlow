@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using ORFlow.Api.ErrorHandling;
+using ORFlow.Api.Contracts.SurgeryRequests;
 using ORFlow.Application.SurgeryRequests.Approve;
 using ORFlow.Application.SurgeryRequests.Archive;
 using ORFlow.Application.SurgeryRequests.Common;
@@ -16,6 +18,10 @@ var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.AddOpenApi();
+
+builder.Services.AddProblemDetails();
+
+builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 
 builder.Services.AddDbContext<ORFlowDbContext>(options =>
     options.UseSqlServer(
@@ -37,6 +43,18 @@ builder.Services.AddAuthorization(options =>
         policy.RequireRole(
             ApplicationRoles.Scheduler,
             ApplicationRoles.Administrator));
+});
+
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("Frontend", policy =>
+    {
+        policy
+            .WithOrigins("http://localhost:5173")
+            .AllowAnyHeader()
+            .AllowAnyMethod()
+            .AllowCredentials();
+    });
 });
 
 builder.Services.AddScoped<ISurgeryRequestRepository, SurgeryRequestRepository>();
@@ -69,7 +87,9 @@ if (app.Environment.IsDevelopment())
     app.MapOpenApi();
 }
 
+app.UseExceptionHandler();
 app.UseHttpsRedirection();
+app.UseCors("Frontend");
 app.UseAuthentication();
 app.UseAuthorization();
 
@@ -82,15 +102,23 @@ app.MapGet("/health", () => "ORFlow API is running.");
 
 // Surgery request endpoints.
 app.MapPost("/surgery-requests", async (
-    CreateSurgeryRequestCommand command,
+    CreateSurgeryRequestRequest request,
     CreateSurgeryRequestHandler handler
 ) =>
 {
-    var surgeryRequest = await handler.HandleAsync(command);
+    var command = new CreateSurgeryRequestCommand(
+        request.PatientId,
+        request.SurgeonId,
+        request.OperatingRoomId,
+        request.ProcedureName,
+        request.RequestedStartTime,
+        request.RequestedEndTime);
+
+    SurgeryRequest surgeryRequest = await handler.HandleAsync(command);
 
     return Results.Created(
         $"/surgery-requests/{surgeryRequest.SurgeryRequestId}",
-        surgeryRequest);
+        ToResponse(surgeryRequest));
 })
 .RequireAuthorization("CanCreateSurgeryRequest");
 
@@ -99,14 +127,14 @@ app.MapGet("/surgery-requests/{id:guid}", async (
     GetSurgeryRequestByIdHandler handler
 ) =>
 {
-    var surgeryRequest = await handler.HandleAsync(id);
+    SurgeryRequest? surgeryRequest = await handler.HandleAsync(id);
 
     if (surgeryRequest is null)
     {
         return Results.NotFound();
     }
 
-    return Results.Ok(surgeryRequest);
+    return Results.Ok(ToResponse(surgeryRequest));
 })
 .RequireAuthorization();
 
@@ -122,7 +150,7 @@ app.MapPost("/surgery-requests/{id:guid}/approve", async (
         return Results.NotFound();
     }
 
-    return Results.Ok(surgeryRequest);
+    return Results.Ok(ToResponse(surgeryRequest));
 })
 .RequireAuthorization("CanManageSurgeryRequest");
 
@@ -143,11 +171,11 @@ app.MapPost("/surgery-requests/{id:guid}/schedule", async (
         return Results.Conflict(new
         {
             message = "Scheduling conflict detected.",
-            surgeryRequest = result.SurgeryRequest
+            surgeryRequest = ToResponse(result.SurgeryRequest)
         });
     }
 
-    return Results.Ok(result.SurgeryRequest);
+    return Results.Ok(ToResponse(result.SurgeryRequest));
 })
 .RequireAuthorization("CanManageSurgeryRequest");
 
@@ -163,7 +191,7 @@ app.MapPost("/surgery-requests/{id:guid}/complete", async (
         return Results.NotFound();
     }
 
-    return Results.Ok(surgeryRequest);
+    return Results.Ok(ToResponse(surgeryRequest));
 })
 .RequireAuthorization("CanManageSurgeryRequest");
 
@@ -179,10 +207,23 @@ app.MapPost("/surgery-requests/{id:guid}/archive", async (
         return Results.NotFound();
     }
 
-    return Results.Ok(surgeryRequest);
+    return Results.Ok(ToResponse(surgeryRequest));
 })
 .RequireAuthorization("CanManageSurgeryRequest");
 
 app.Run();
+
+static SurgeryRequestResponse ToResponse(SurgeryRequest surgeryRequest)
+{
+    return new SurgeryRequestResponse(
+        surgeryRequest.SurgeryRequestId,
+        surgeryRequest.PatientId,
+        surgeryRequest.SurgeonId,
+        surgeryRequest.OperatingRoomId,
+        surgeryRequest.ProcedureName,
+        surgeryRequest.RequestedTime.Start,
+        surgeryRequest.RequestedTime.End,
+        surgeryRequest.RequestStatus);
+}
 
 public partial class Program { }

@@ -63,6 +63,17 @@ public class SurgeryRequestWorkflowTests
             0,
             created.GetProperty("requestStatus").GetInt32());
 
+        Assert.Equal(
+            command.RequestedStartTime,
+            created.GetProperty("requestedStartTime").GetDateTimeOffset());
+
+        Assert.Equal(
+            command.RequestedEndTime,
+            created.GetProperty("requestedEndTime").GetDateTimeOffset());
+
+        Assert.False(
+            created.TryGetProperty("requestedTime", out _));
+
         HttpResponseMessage approveResponse =
             await schedulerClient.PostAsync(
                 $"/surgery-requests/{surgeryRequestId}/approve",
@@ -283,4 +294,170 @@ public class SurgeryRequestWorkflowTests
             1,
             retrieved.GetProperty("requestStatus").GetInt32());
     }
+
+    [Fact]
+    public async Task Create_WithInvalidProcedureName_ReturnsBadRequest()
+    {
+        HttpClient surgeonClient =
+            await AuthenticationHelper.CreateAuthenticatedClientAsync(
+                _factory,
+                $"surgeon-{Guid.NewGuid()}@orflow.test",
+                ApplicationRoles.Surgeon);
+
+        var request = new
+        {
+            PatientId = Guid.NewGuid(),
+            SurgeonId = Guid.NewGuid(),
+            OperatingRoomId = Guid.NewGuid(),
+            ProcedureName = "",
+            RequestedStartTime =
+                new DateTimeOffset(2026, 10, 3, 14, 0, 0, TimeSpan.Zero),
+            RequestedEndTime =
+                new DateTimeOffset(2026, 10, 3, 16, 0, 0, TimeSpan.Zero)
+        };
+
+        HttpResponseMessage response =
+            await surgeonClient.PostAsJsonAsync(
+                "/surgery-requests",
+                request);
+
+        Assert.Equal(
+            HttpStatusCode.BadRequest,
+            response.StatusCode);
+
+        JsonElement problem =
+    await response.Content.ReadFromJsonAsync<JsonElement>();
+
+        Assert.Equal(
+            "Invalid request",
+            problem.GetProperty("title").GetString());
+
+        Assert.Equal(
+            400,
+            problem.GetProperty("status").GetInt32());
+
+        Assert.Contains(
+            "Procedure name cannot be null or empty.",
+            problem.GetProperty("detail").GetString());
+    }
+
+    [Fact]
+    public async Task Create_WhenEndTimeIsNotAfterStartTime_ReturnsBadRequest()
+    {
+        HttpClient surgeonClient =
+            await AuthenticationHelper.CreateAuthenticatedClientAsync(
+                _factory,
+                $"surgeon-{Guid.NewGuid()}@orflow.test",
+                ApplicationRoles.Surgeon);
+
+        DateTimeOffset startTime =
+            new DateTimeOffset(2026, 10, 3, 14, 0, 0, TimeSpan.Zero);
+
+        var request = new
+        {
+            PatientId = Guid.NewGuid(),
+            SurgeonId = Guid.NewGuid(),
+            OperatingRoomId = Guid.NewGuid(),
+            ProcedureName = "Invalid Time Procedure",
+            RequestedStartTime = startTime,
+            RequestedEndTime = startTime
+        };
+
+        HttpResponseMessage response =
+            await surgeonClient.PostAsJsonAsync(
+                "/surgery-requests",
+                request);
+
+        Assert.Equal(
+            HttpStatusCode.BadRequest,
+            response.StatusCode);
+
+        JsonElement problem =
+            await response.Content.ReadFromJsonAsync<JsonElement>();
+
+        Assert.Equal(
+            "Invalid request",
+            problem.GetProperty("title").GetString());
+
+        Assert.Equal(
+            400,
+            problem.GetProperty("status").GetInt32());
+
+        Assert.Contains(
+            "End time must be later than start time.",
+            problem.GetProperty("detail").GetString());
+    }
+
+    [Fact]
+    public async Task Complete_WhenRequestIsNotScheduled_ReturnsConflict()
+    {
+        HttpClient surgeonClient =
+            await AuthenticationHelper.CreateAuthenticatedClientAsync(
+                _factory,
+                $"surgeon-{Guid.NewGuid()}@orflow.test",
+                ApplicationRoles.Surgeon);
+
+        HttpClient schedulerClient =
+            await AuthenticationHelper.CreateAuthenticatedClientAsync(
+                _factory,
+                $"scheduler-{Guid.NewGuid()}@orflow.test",
+                ApplicationRoles.Scheduler);
+
+        var request = new
+        {
+            PatientId = Guid.NewGuid(),
+            SurgeonId = Guid.NewGuid(),
+            OperatingRoomId = Guid.NewGuid(),
+            ProcedureName = "Invalid Transition Procedure",
+            RequestedStartTime =
+                new DateTimeOffset(2026, 10, 4, 14, 0, 0, TimeSpan.Zero),
+            RequestedEndTime =
+                new DateTimeOffset(2026, 10, 4, 16, 0, 0, TimeSpan.Zero)
+        };
+
+        HttpResponseMessage createResponse =
+            await surgeonClient.PostAsJsonAsync(
+                "/surgery-requests",
+                request);
+
+        JsonElement created =
+            await createResponse.Content.ReadFromJsonAsync<JsonElement>();
+
+        Guid surgeryRequestId =
+            created.GetProperty("surgeryRequestId").GetGuid();
+
+        HttpResponseMessage approveResponse =
+            await schedulerClient.PostAsync(
+                $"/surgery-requests/{surgeryRequestId}/approve",
+                null);
+
+        Assert.Equal(
+            HttpStatusCode.OK,
+            approveResponse.StatusCode);
+
+        HttpResponseMessage completeResponse =
+            await schedulerClient.PostAsync(
+                $"/surgery-requests/{surgeryRequestId}/complete",
+                null);
+
+        Assert.Equal(
+            HttpStatusCode.Conflict,
+            completeResponse.StatusCode);
+
+        JsonElement problem =
+            await completeResponse.Content.ReadFromJsonAsync<JsonElement>();
+
+        Assert.Equal(
+            "Invalid operation",
+            problem.GetProperty("title").GetString());
+
+        Assert.Equal(
+            409,
+            problem.GetProperty("status").GetInt32());
+
+        Assert.Contains(
+            "Only scheduled surgery requests can be completed.",
+            problem.GetProperty("detail").GetString());
+    }
+
 }
