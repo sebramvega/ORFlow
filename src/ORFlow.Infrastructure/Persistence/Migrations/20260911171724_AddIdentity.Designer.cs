@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using ORFlow.Infrastructure.Persistence;
 
@@ -12,9 +13,11 @@ using ORFlow.Infrastructure.Persistence;
 namespace ORFlow.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(ORFlowDbContext))]
-    partial class ORFlowDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260911171724_AddIdentity")]
+    partial class AddIdentity
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder

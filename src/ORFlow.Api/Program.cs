@@ -1,3 +1,5 @@
+using Microsoft.AspNetCore.Identity;
+using ORFlow.Infrastructure.Identity;
 using Microsoft.EntityFrameworkCore;
 using ORFlow.Application.SurgeryRequests.Approve;
 using ORFlow.Application.SurgeryRequests.Archive;
@@ -18,6 +20,11 @@ builder.Services.AddOpenApi();
 builder.Services.AddDbContext<ORFlowDbContext>(options =>
     options.UseSqlServer(
         builder.Configuration.GetConnectionString("ORFlowDatabase")));
+builder.Services
+    .AddIdentityApiEndpoints<ApplicationUser>()
+    .AddRoles<IdentityRole<Guid>>()
+    .AddEntityFrameworkStores<ORFlowDbContext>();
+builder.Services.AddAuthorization();
 builder.Services.AddScoped<ISurgeryRequestRepository, SurgeryRequestRepository>();
 builder.Services.AddScoped<CreateSurgeryRequestHandler>();
 builder.Services.AddScoped<GetSurgeryRequestByIdHandler>();
@@ -28,6 +35,19 @@ builder.Services.AddScoped<ArchiveSurgeryRequestHandler>();
 
 var app = builder.Build();
 
+using (IServiceScope scope = app.Services.CreateScope())
+{
+    ORFlowDbContext dbContext =
+        scope.ServiceProvider.GetRequiredService<ORFlowDbContext>();
+
+    await dbContext.Database.EnsureCreatedAsync();
+
+    RoleManager<IdentityRole<Guid>> roleManager =
+        scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole<Guid>>>();
+
+    await IdentityInitializer.InitializeRolesAsync(roleManager);
+}
+
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
@@ -35,7 +55,12 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+app.UseAuthentication();
+app.UseAuthorization();
 
+app.MapGroup("/auth")
+    .MapIdentityApi<ApplicationUser>();
+    
 app.MapGet("/health", () => "ORFlow API is running.");
 
 app.MapPost("/surgery-requests", async (
