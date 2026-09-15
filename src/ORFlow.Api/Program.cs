@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using ORFlow.Api.ErrorHandling;
+using ORFlow.Api.Contracts.Authentication;
 using ORFlow.Api.Contracts.SurgeryRequests;
 using ORFlow.Application.SurgeryRequests.Approve;
 using ORFlow.Application.SurgeryRequests.Archive;
@@ -79,6 +80,14 @@ using (IServiceScope scope = app.Services.CreateScope())
         scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole<Guid>>>();
 
     await IdentityInitializer.InitializeRolesAsync(roleManager);
+
+    if (app.Environment.IsDevelopment())
+    {
+        UserManager<ApplicationUser> userManager =
+            scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+
+        await IdentityInitializer.InitializeDevelopmentUsersAsync(userManager);
+    }
 }
 
 // Configure the HTTP request pipeline.
@@ -96,6 +105,39 @@ app.UseAuthorization();
 // Authentication endpoints.
 app.MapGroup("/auth")
     .MapIdentityApi<ApplicationUser>();
+
+app.MapGet("/auth/me", async (
+    UserManager<ApplicationUser> userManager,
+    HttpContext httpContext
+) =>
+{
+    ApplicationUser? user =
+        await userManager.GetUserAsync(httpContext.User);
+
+    if (user is null)
+    {
+        return Results.Unauthorized();
+    }
+
+    IList<string> roles =
+        await userManager.GetRolesAsync(user);
+
+    return Results.Ok(
+        new CurrentUserResponse(
+            user.Email ?? string.Empty,
+            roles.ToArray()));
+})
+.RequireAuthorization();
+
+app.MapPost("/auth/logout", async (
+    SignInManager<ApplicationUser> signInManager
+) =>
+{
+    await signInManager.SignOutAsync();
+
+    return Results.Ok();
+})
+.RequireAuthorization();
 
 // Public health endpoint.
 app.MapGet("/health", () => "ORFlow API is running.");
